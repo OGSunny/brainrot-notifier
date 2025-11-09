@@ -1,6 +1,6 @@
 task.spawn(function()
     if game.PlaceId ~= 109983668079237 then return end
-    if workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Codes") and workspace.Map.Codes:FindFirstChild("Main") and workspace.Map.Codes.Main:FindFirstChild("SurfaceGui") and workspace.Map.Codes.Main.SurfaceGui.MainFrame and workspace.Map.Codes.Main.SurfaceGui.MainFrame:FindFirstChild("PrivateServerMessage") and workspace.Map.Codes.Main.SurfaceGui.MainFrame.PrivateServerMessage.Visible == true then return end
+    if workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Codes") and workspace.Map.Codes:FindFirstChild("Main") and workspace.Map.Codes.Main:FindFirstChild("SurfaceGui") and workspace.Map.Codes.Main.SurfaceGui:FindFirstChild("MainFrame") and workspace.Map.Codes.Main.SurfaceGui.MainFrame:FindFirstChild("PrivateServerMessage") and workspace.Map.Codes.Main.SurfaceGui.MainFrame.PrivateServerMessage.Visible == true then return end
     local H = game:GetService("HttpService")
     local P = game:GetService("Players")
     local L = P.LocalPlayer
@@ -77,9 +77,9 @@ task.spawn(function()
                 fields = {
                     {name = "📊 Server Info", value = J(), inline = false},
                     {name = "🆔 Job ID", value = "```" .. tostring(game.JobId) .. "```", inline = false},
-                    {name = "🔗 Join Server", value = "[CLICK TO JOIN](https://yourusername.github.io/brainrot-notifier/?placeId=" .. game.PlaceId .. "&gameInstanceId=" .. game.JobId .. ")", inline = false}
+                    {name = "🔗 Join Server", value = "[CLICK TO JOIN](https://ogsunny.github.io/brainrot-notifier/?placeId=" .. game.PlaceId .. "&gameInstanceId=" .. game.JobId .. ")", inline = false}
                 },
-                footer = {text = "Brainrot Notifier 🧠 | Scanner " .. n .. " | " .. tm}
+                footer = {text = "Zvios Hub ZH Notifier 🧠 | Scanner " .. n .. " | " .. tm}
             }}
         }
         local ti = os.time()
@@ -98,10 +98,10 @@ task.spawn(function()
     task.spawn(function()
         while task.wait(5) do
             pcall(function()
-                w(g("1M/s", "4.99M/s"), "https://brainrot-notifier.jemalagegidze.workers.dev/medium", "1M-5M", "MEDIUM VALUE BRAINTOTS DETECTED")
-                w(g("5M/s", "9.99M/s"), "https://brainrot-notifier.jemalagegidze.workers.dev/high", "5M-10M", "HIGH VALUE BRAINTOTS DETECTED")
-                w(g("10M/s", "29.99M/s"), "https://brainrot-notifier.jemalagegidze.workers.dev/ultra", "10M-30M", "ULTRA VALUE BRAINTOTS DETECTED")
-                w(g("30M/s", "5B/s"), "https://brainrot-notifier.jemalagegidze.workers.dev/supreme", "30M-5B", "SUPREME VALUE BRAINTOTS DETECTED")
+                w(g("1M/s", "4.99M/s"), "https://notifier.jemalagegidze.workers.dev/medium", "1M-5M", "MEDIUM VALUE BRAINTOTS DETECTED")
+                w(g("5M/s", "9.99M/s"), "https://notifier.jemalagegidze.workers.dev/high", "5M-10M", "HIGH VALUE BRAINTOTS DETECTED")
+                w(g("10M/s", "29.99M/s"), "https://notifier.jemalagegidze.workers.dev/ultra", "10M-30M", "ULTRA VALUE BRAINTOTS DETECTED")
+                w(g("30M/s", "5B/s"), "https://notifier.jemalagegidze.workers.dev/supreme", "30M-5B", "SUPREME VALUE BRAINTOTS DETECTED")
             end)
         end
     end)
