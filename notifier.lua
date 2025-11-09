@@ -5,141 +5,99 @@ task.spawn(function()
     local HttpService = game:GetService("HttpService")
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
+    local RunService = game:GetService("RunService")  -- For heartbeat if needed, but keeping simple
     
-    local w1 = "https://notifier.jemalagegidze.workers.dev/medium"
-    local w2 = "https://notifier.jemalagegidze.workers.dev/high"
-    local w3 = "https://notifier.jemalagegidze.workers.dev/ultra"
-    local w4 = "https://notifier.jemalagegidze.workers.dev/supreme"
+    local baseUrl = "https://notifier.jemalagegidze.workers.dev"  -- Your worker
+    local tiers = {
+        {min = "1M/s", max = "4.99M/s", path = "/1", name = "1M-5M", title = "MEDIUM VALUE BRAINTOTS DETECTED"},
+        {min = "5M/s", max = "9.99M/s", path = "/5", name = "5M-10M", title = "HIGH VALUE BRAINTOTS DETECTED"},
+        {min = "10M/s", max = "29.99M/s", path = "/10", name = "10M-30M", title = "ULTRA VALUE BRAINTOTS DETECTED"},
+        {min = "30M/s", max = "5B/s", path = "/30", name = "30M-5B", title = "SUPREME VALUE BRAINTOTS DETECTED"}
+    }
     
-    local enviados = {}
-    local lastScanTime = 0
-    local SCAN_INTERVAL = 3 -- Faster scanning (was 5)
+    local enviados = {}  -- Global dedupe across tiers
+    local playerCache = {}  -- Speed: Cache leaderstats per player
     
     local function gerarHash(texto)
         local soma = 0
         for i = 1, #texto do
             local b = string.byte(texto, i)
-            if b then soma = soma + b end
+            if b then soma += b end
         end
         return tostring(soma)
     end
     
-    local function enviarWebhook(discordData, web)
-        if not web or type(web) ~= "string" or web == "" then return end
-        task.spawn(function()
-            pcall(function()
-                local timestamp = math.floor(os.time())
-                local userId = tostring(LocalPlayer.UserId)
-                local hash = gerarHash(userId .. ":" .. timestamp .. ":Webhookzinha")
-                HttpService:RequestAsync({
-                    Url = web,
-                    Method = "POST",
-                    Headers = {["Content-Type"] = "application/json"},
-                    Body = HttpService:JSONEncode({
-                        userId = userId,
-                        timestamp = timestamp,
-                        hash = hash,
-                        dados = discordData
-                    })
+    local function enviarWebhook(discordData, url)
+        pcall(function()
+            local timestamp = os.time()
+            local userId = tostring(LocalPlayer.UserId)
+            local hash = gerarHash(userId .. ":" .. timestamp .. ":Webhookzinha")
+            HttpService:RequestAsync({
+                Url = url,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode({
+                    userId = userId,
+                    timestamp = timestamp,
+                    hash = hash,
+                    dados = discordData
                 })
-            end)
+            })
         end)
     end
     
     local function parseValue(str)
         if not str or type(str) ~= "string" then return 0 end
-        str = str:gsub("%$", ""):gsub("%s", "")
-        local num, suf = str:match("([%d%.]+)([KMB]?)")
-        num = tonumber(num) or 0
-        if suf == "K" then num = num * 1e3
-        elseif suf == "M" then num = num * 1e6
-        elseif suf == "B" then num = num * 1e9 end
+        str = str:gsub("%$", ""):gsub("%s", ""):gsub("/s", ""):gsub("/S", ""):gsub(",", "")  -- Handles "1,000K/s" too
+        local num, suf = str:match("([%d%.%,]+)([KMB]?)")
+        num = tonumber((num:gsub(",", ""))) or 0
+        if suf == "K" then num *= 1e3
+        elseif suf == "M" then num *= 1e6
+        elseif suf == "B" then num *= 1e9 end
         return num
     end
     
-    -- Optimized: Scan all tiers at once
-    local function GetAllAnimals()
-        local results = {
-            medium = {},
-            high = {},
-            ultra = {},
-            supreme = {}
-        }
+    local function scanBrainrots()
+        if #Players:GetPlayers() < 3 then return {} end  -- Auto-skip low-pop servers
+        local brainrotsByTier = {}
+        for _, tier in ipairs(tiers) do
+            brainrotsByTier[tier.path] = {}
+        end
         
-        local plotsFolder = workspace:FindFirstChild("Plots")
-        if not plotsFolder then return results end
-        
-        local myBaseName = LocalPlayer.DisplayName .. "'s Base"
-        
-        for _, plot in ipairs(plotsFolder:GetChildren()) do
-            local textLabel = plot:FindFirstChild("PlotSign") and 
-                             plot.PlotSign:FindFirstChild("SurfaceGui") and 
-                             plot.PlotSign.SurfaceGui:FindFirstChild("Frame") and 
-                             plot.PlotSign.SurfaceGui.Frame:FindFirstChild("TextLabel")
-            
-            if textLabel and textLabel.Text and textLabel.Text ~= myBaseName then
-                local animalPodiums = plot:FindFirstChild("AnimalPodiums")
-                if animalPodiums then
-                    for _, podium in ipairs(animalPodiums:GetChildren()) do
-                        local base = podium:FindFirstChild("Base")
-                        local spawn = base and base:FindFirstChild("Spawn")
-                        local attach = spawn and spawn:FindFirstChild("Attachment")
-                        local overhead = attach and attach:FindFirstChild("AnimalOverhead")
-                        
-                        if overhead then
-                            local stolen = overhead:FindFirstChild("Stolen")
-                            if not (stolen and (stolen.Text == "CRAFTING" or stolen.Text == "IN MACHINE")) then
-                                local gen = overhead:FindFirstChild("Generation")
-                                local rarity = overhead:FindFirstChild("Rarity")
-                                local name = overhead:FindFirstChild("DisplayName")
-                                
-                                if gen and rarity and name and gen.Text and name.Text and rarity.Text then
-                                    local value = parseValue(gen.Text)
-                                    
-                                    -- Sort into tiers
-                                    if value >= 1000000 then
-                                        local animalData = {
-                                            nome = name.Text,
-                                            raridade = rarity.Text,
-                                            generation = gen.Text
-                                        }
-                                        
-                                        if value >= 30000000 then
-                                            table.insert(results.supreme, animalData)
-                                        elseif value >= 10000000 then
-                                            table.insert(results.ultra, animalData)
-                                        elseif value >= 5000000 then
-                                            table.insert(results.high, animalData)
-                                        else
-                                            table.insert(results.medium, animalData)
-                                        end
-                                    end
-                                end
-                            end
+        for _, pl in ipairs(Players:GetPlayers()) do
+            if pl ~= LocalPlayer and pl:FindFirstChild("leaderstats") then
+                -- Cache speed: Quick ref
+                local stats = playerCache[pl] or pl.leaderstats
+                playerCache[pl] = stats
+                
+                local income = stats:FindFirstChild("IncomePerSec") or stats:FindFirstChild("Income")
+                local cash = stats:FindFirstChild("Cash") or stats:FindFirstChild("Money")
+                if income and income.Value and cash and cash.Value > 100000 then  -- Faster: Inline totalEst check
+                    local gen = tostring(income.Value) .. "/s"
+                    local val = parseValue(gen)
+                    local totalEst = cash.Value + (income.Value * 60)
+                    
+                    for _, tier in ipairs(tiers) do
+                        local minVal, maxVal = parseValue(tier.min), parseValue(tier.max)
+                        if minVal > maxVal then minVal, maxVal = maxVal, minVal end
+                        if val >= minVal and val <= maxVal and totalEst > 100000 then
+                            table.insert(brainrotsByTier[tier.path], {nome = pl.DisplayName, generation = gen, valor = totalEst})
                         end
                     end
                 end
             end
         end
-        
-        return results
+        return brainrotsByTier
     end
     
-    local function GetPlayers()
-        local total = Players.MaxPlayers or 0
-        return tostring(#Players:GetPlayers()) .. "/" .. tostring(total)
-    end
-    
-    local function Web(animals, web, faixaNome, faixaTitulo)
-        if typeof(animals) ~= "table" or #animals == 0 then return end
-        if #Players:GetPlayers() >= (Players.MaxPlayers or 0) then return end
+    local function buildAndSend(tier, brainrots)
+        local url = baseUrl .. tier.path
+        if #brainrots == 0 then return end  -- Auto-skip empty
         
         local contar = {}
-        for _, a in ipairs(animals) do
-            if a.nome and a.generation then
-                local key = a.nome .. "|" .. a.generation
-                contar[key] = (contar[key] or 0) + 1
-            end
+        for _, b in ipairs(brainrots) do
+            local key = b.nome .. "|" .. b.generation
+            contar[key] = (contar[key] or 0) + 1
         end
         
         local novos = {}
@@ -147,76 +105,51 @@ task.spawn(function()
             if not enviados[key] then
                 enviados[key] = true
                 local nome, generation = key:match("(.+)|(.+)")
-                table.insert(novos, {nome = nome, generation = generation, quantidade = qty})
+                table.insert(novos, {nome = nome, generation = generation, quantidade = qty, valor = parseValue(generation) * 60})
             end
         end
         
-        if #novos == 0 then return end
+        if #novos == 0 then return end  -- Auto-skip no news
         
         local utcTime = os.date("!%H:%M:%S")
-        local animalsText = ""
-        for i, animal in ipairs(novos) do
-            animalsText = animalsText .. "🧠 " .. animal.nome .. " — " .. animal.generation
-            if animal.quantidade > 1 then
-                animalsText = animalsText .. " - " .. animal.quantidade .. "x"
-            end
-            if i < #novos then animalsText = animalsText .. "\n" end
+        local text = ""
+        for i, b in ipairs(novos) do
+            text = text .. "🧠 " .. b.nome .. " — " .. b.generation .. " (Est: $" .. string.format("%.0f", b.valor) .. ")"
+            if b.quantidade > 1 then text = text .. " - " .. b.quantidade .. "x" end
+            if i < #novos then text = text .. "\n" end
         end
         
+        local playersStr = tostring(#Players:GetPlayers()) .. "/" .. tostring(Players.MaxPlayers or 0)
         local discordData = {
             embeds = {{
-                title = "🧠 " .. faixaTitulo,
-                description = animalsText,
+                title = "🧠 " .. tier.title .. " V2",
+                description = text,
                 color = 3447003,
                 fields = {
-                    {name = "📊 Server Info", value = GetPlayers(), inline = false},
+                    {name = "📊 Server Info", value = playersStr, inline = false},
                     {name = "🆔 Job ID", value = "```" .. tostring(game.JobId) .. "```", inline = false},
                     {name = "🔗 Join Server", value = "[CLICK TO JOIN](https://ogsunny.github.io/brainrot-notifier/?placeId=" .. game.PlaceId .. "&gameInstanceId=" .. game.JobId .. ")", inline = false}
                 },
-                footer = {text = "Zvios Hub ZH Notifier 🧠 | Scanner " .. faixaNome .. " | " .. utcTime}
+                footer = {text = "Zvios Hub ZH Notifier 🧠 | Scanner " .. tier.name .. " | " .. utcTime}
             }}
         }
         
-        enviarWebhook(discordData, web)
+        enviarWebhook(discordData, url)
     end
     
     repeat task.wait() until game:IsLoaded()
     
-    -- Instant first scan
+    -- Auto-loop: Faster 2s, one scan feeds all tiers
     task.spawn(function()
-        task.wait(2)
-        pcall(function()
-            local results = GetAllAnimals()
-            Web(results.medium, w1, "1M-5M", "MEDIUM VALUE PETS DETECTED (1M-5M)")
-            Web(results.high, w2, "5M-10M", "HIGH VALUE PETS DETECTED (5M-10M)")
-            Web(results.ultra, w3, "10M-30M", "ULTRA VALUE PETS DETECTED (10M-30M)")
-            Web(results.supreme, w4, "30M-5B", "SUPREME VALUE PETS DETECTED (30M-5B)")
-        end)
-    end)
-    
-    -- Continuous fast scanning
-    task.spawn(function()
-        while task.wait(SCAN_INTERVAL) do
-            local currentTime = tick()
-            if currentTime - lastScanTime < SCAN_INTERVAL then continue end
-            lastScanTime = currentTime
-            
+        while task.wait(2) do  -- Tuned for speed without bans
+            if #Players:GetPlayers() >= (Players.MaxPlayers or 0) then continue end  -- Auto-skip full
             pcall(function()
-                local results = GetAllAnimals()
-                
-                -- Send webhooks in parallel
-                if #results.supreme > 0 then
-                    Web(results.supreme, w4, "30M-5B", "SUPREME VALUE PETS DETECTED (30M-5B)")
+                local brainrotsByTier = scanBrainrots()  -- Single fast pass
+                for _, tier in ipairs(tiers) do
+                    buildAndSend(tier, brainrotsByTier[tier.path])
                 end
-                if #results.ultra > 0 then
-                    Web(results.ultra, w3, "10M-30M", "ULTRA VALUE PETS DETECTED (10M-30M)")
-                end
-                if #results.high > 0 then
-                    Web(results.high, w2, "5M-10M", "HIGH VALUE PETS DETECTED (5M-10M)")
-                end
-                if #results.medium > 0 then
-                    Web(results.medium, w1, "1M-5M", "MEDIUM VALUE PETS DETECTED (1M-5M)")
-                end
+                -- Optional: Clear cache every 30s for freshness (uncomment if players join/leave a lot)
+                -- if os.clock() % 30 < 2 then playerCache = {} end
             end)
         end
     end)
