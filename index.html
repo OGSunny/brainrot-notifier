@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head><title>Brainrot Joiner</title></head>
+<body>
+  <h1>Copy & Paste to Executor:</h1>
+  <textarea id="script" rows="3" cols="50" readonly></textarea>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const placeId = urlParams.get('placeId') || '109983668079237';
+    const jobId = urlParams.get('gameInstanceId');
+    document.getElementById('script').value = `local TeleportService = game:GetService("TeleportService")\nTeleportService:TeleportToPlaceInstance(${placeId}, "${jobId}")`;
+  </script>
+</body>
+</html>
