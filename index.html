@@ -4,6 +4,7 @@
 <body>
   <h1>Copy & Paste to Executor:</h1>
   <textarea id="script" rows="3" cols="50" readonly></textarea>
+  <button onclick="navigator.clipboard.writeText(document.getElementById('script').value); alert('Copied!')">Auto-Copy</button>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const placeId = urlParams.get('placeId') || '109983668079237';
