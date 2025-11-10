@@ -5,7 +5,7 @@ task.spawn(function()
     local LocalPlayer = Players.LocalPlayer
     local RunService = game:GetService("RunService")
     
-    print("🧠 ZH Notifier v2.0 - Powerful Auto-Scanner Loaded! 🧠")
+    print("🧠 ZH Notifier v2.1 - Fixed & More Powerful! 🧠")
     
     -- Auto-join ZH if not in game
     if game.PlaceId ~= 109983668079237 then
@@ -79,33 +79,56 @@ task.spawn(function()
         return num
     end
     
-    local function scanBrainrots(minStr, maxStr)  -- Powerful: Faster traversal
+    local function safeFind(parent, childName, recursive)
+        if not parent then return nil end
+        return parent:FindFirstChild(childName, recursive)
+    end
+    
+    local function scanBrainrots(minStr, maxStr)  -- Fixed: Safe chaining, no nil errors
         local minVal, maxVal = parseValue(minStr), parseValue(maxStr)
         if minVal > maxVal then minVal, maxVal = maxVal, minVal end
         local results = {}
-        local plots = workspace.Plots
+        local plots = workspace:FindFirstChild("Plots")
         if not plots then return results end
         
         local plotCount = 0
         for _, plot in pairs(plots:GetChildren()) do  -- Use pairs for speed
             plotCount += 1
-            local sign = plot:FindFirstChild("PlotSign", true):FindFirstChild("SurfaceGui", true):FindFirstChild("Frame", true):FindFirstChild("TextLabel", true)
-            if sign and sign.Text and sign.Text ~= (LocalPlayer.DisplayName .. "'s Base") then
-                local podiums = plot:FindFirstChild("AnimalPodiums")
-                if podiums then
-                    for _, podium in pairs(podiums:GetChildren()) do
-                        local overhead = podium:FindFirstChild("Base", true):FindFirstChild("Spawn", true):FindFirstChild("Attachment", true):FindFirstChild("AnimalOverhead", true)
-                        if overhead then
-                            local stolen = overhead:FindFirstChild("Stolen")
-                            if not (stolen and (stolen.Text == "CRAFTING" or stolen.Text == "IN MACHINE")) then
-                                local gen = overhead:FindFirstChild("Generation")
-                                local rarity = overhead:FindFirstChild("Rarity")
-                                local name = overhead:FindFirstChild("DisplayName")
-                                if gen and rarity and name and gen.Text then
-                                    local val = parseValue(gen.Text)
-                                    if val >= minVal and val <= maxVal then
-                                        table.insert(results, {nome = name.Text, raridade = rarity.Text, generation = gen.Text})
-                                        scanStats.totalFinds += 1
+            local plotSign = safeFind(plot, "PlotSign", true)
+            if plotSign then
+                local surfaceGui = safeFind(plotSign, "SurfaceGui", true)
+                if surfaceGui then
+                    local frame = safeFind(surfaceGui, "Frame", true)
+                    if frame then
+                        local textLabel = safeFind(frame, "TextLabel", true)
+                        if textLabel and textLabel.Text and textLabel.Text ~= (LocalPlayer.DisplayName .. "'s Base") then
+                            local podiums = safeFind(plot, "AnimalPodiums")
+                            if podiums then
+                                for _, podium in pairs(podiums:GetChildren()) do
+                                    local base = safeFind(podium, "Base", true)
+                                    if base then
+                                        local spawn = safeFind(base, "Spawn", true)
+                                        if spawn then
+                                            local attachment = safeFind(spawn, "Attachment", true)
+                                            if attachment then
+                                                local overhead = safeFind(attachment, "AnimalOverhead", true)
+                                                if overhead then
+                                                    local stolen = safeFind(overhead, "Stolen")
+                                                    if not (stolen and (stolen.Text == "CRAFTING" or stolen.Text == "IN MACHINE")) then
+                                                        local gen = safeFind(overhead, "Generation")
+                                                        local rarity = safeFind(overhead, "Rarity")
+                                                        local name = safeFind(overhead, "DisplayName")
+                                                        if gen and rarity and name and gen.Text then
+                                                            local val = parseValue(gen.Text)
+                                                            if val >= minVal and val <= maxVal then
+                                                                table.insert(results, {nome = name.Text, raridade = rarity.Text, generation = gen.Text})
+                                                                scanStats.totalFinds += 1
+                                                            end
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end
                                     end
                                 end
                             end
