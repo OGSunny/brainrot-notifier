@@ -8,7 +8,7 @@ task.spawn(function()
     local CONFIG = {
         botId = "ZHBot_" .. math.random(1000, 9999),
         PLACE_ID = 109983668079237,
-        hopDelay = 45,  -- Time to scan before hopping
+        hopDelay = 25,  -- Time to scan before hopping
         maxPopulation = 6,  -- Only scan low-pop servers
         maxEnviadosSize = 500,  -- Prevent memory leak
         baseUrl = "https://notifier.jemalagegidze.workers.dev",
