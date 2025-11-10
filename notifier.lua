@@ -5,7 +5,7 @@ task.spawn(function()
     local LocalPlayer = Players.LocalPlayer
     local RunService = game:GetService("RunService")
     
-    print("🧠 ZH Notifier v2.1 - Fixed & More Powerful! 🧠")
+    print("🧠 ZH Notifier v2.2 - Ultra-Fixed & Powerful! 🧠")
     
     -- Auto-join ZH if not in game
     if game.PlaceId ~= 109983668079237 then
@@ -22,9 +22,25 @@ task.spawn(function()
             print("🧠 [ZH Notifier] Invalid pop (" .. #Players:GetPlayers() .. ")—hopping soon.")
             return false
         end
-        if workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Codes") and workspace.Map.Codes:FindFirstChild("Main") and workspace.Map.Codes.Main:FindFirstChild("SurfaceGui") and workspace.Map.Codes.Main.SurfaceGui:FindFirstChild("MainFrame") and workspace.Map.Codes.Main.SurfaceGui.MainFrame:FindFirstChild("PrivateServerMessage") and workspace.Map.Codes.Main.SurfaceGui.MainFrame.PrivateServerMessage.Visible == true then
-            print("🧠 [ZH Notifier] Private server detected—hopping.")
-            return false
+        local mapFolder = workspace:FindFirstChild("Map")
+        if mapFolder then
+            local codes = mapFolder:FindFirstChild("Codes")
+            if codes then
+                local main = codes:FindFirstChild("Main")
+                if main then
+                    local surfaceGui = main:FindFirstChild("SurfaceGui")
+                    if surfaceGui then
+                        local mainFrame = surfaceGui:FindFirstChild("MainFrame")
+                        if mainFrame then
+                            local privateMsg = mainFrame:FindFirstChild("PrivateServerMessage")
+                            if privateMsg and privateMsg.Visible == true then
+                                print("🧠 [ZH Notifier] Private server detected—hopping.")
+                                return false
+                            end
+                        end
+                    end
+                end
+            end
         end
         local plots = workspace:FindFirstChild("Plots")
         if not plots or #plots:GetChildren() < 2 then
@@ -52,15 +68,15 @@ task.spawn(function()
     }
     
     local enviados = {}
-    local scanStats = {totalScans = 0, totalFinds = 0}  -- Power: Track stats
+    local scanStats = {totalScans = 0, totalFinds = 0}
     
-    -- Powerful Hop Config: Hop after 60s or invalid
-    local hopDelay = 60  -- Seconds per server (tuned for power: frequent fresh scans)
+    -- Powerful Hop Config
+    local hopDelay = 60
     local hopTimer = tick() + hopDelay
     
     local function powerfulHop(reason)
         print("🧠 [ZH Notifier] Hopping (" .. reason .. ")—stats: " .. scanStats.totalScans .. " scans, " .. scanStats.totalFinds .. " finds.")
-        enviados = {}  -- Reset dedupe for new server
+        enviados = {}
         pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end)
     end
     
@@ -70,21 +86,16 @@ task.spawn(function()
         return tostring(soma)
     end
     
-    local function parseValue(str)  -- Optimized
-        if not str then return 0 end
-        str = str:gsub("[^%d%.KMB]", ""):gsub(",", "")
+    local function parseValue(str)
+        if not str or type(str) ~= "string" then return 0 end
+        str = str:gsub("[^%d%.KMB%s/]", ""):gsub(",", ""):gsub("/s", "")
         local num, suf = str:match("([%d%.]+)([KMB]?)")
         num = tonumber(num) or 0
         if suf == "K" then num *= 1000 elseif suf == "M" then num *= 1000000 elseif suf == "B" then num *= 1000000000 end
         return num
     end
     
-    local function safeFind(parent, childName, recursive)
-        if not parent then return nil end
-        return parent:FindFirstChild(childName, recursive)
-    end
-    
-    local function scanBrainrots(minStr, maxStr)  -- Fixed: Safe chaining, no nil errors
+    local function scanBrainrots(minStr, maxStr)
         local minVal, maxVal = parseValue(minStr), parseValue(maxStr)
         if minVal > maxVal then minVal, maxVal = maxVal, minVal end
         local results = {}
@@ -92,52 +103,63 @@ task.spawn(function()
         if not plots then return results end
         
         local plotCount = 0
-        for _, plot in pairs(plots:GetChildren()) do  -- Use pairs for speed
+        for _, plot in pairs(plots:GetChildren()) do
+            if not plot then continue end  -- Safety
             plotCount += 1
-            local plotSign = safeFind(plot, "PlotSign", true)
-            if plotSign then
-                local surfaceGui = safeFind(plotSign, "SurfaceGui", true)
-                if surfaceGui then
-                    local frame = safeFind(surfaceGui, "Frame", true)
-                    if frame then
-                        local textLabel = safeFind(frame, "TextLabel", true)
-                        if textLabel and textLabel.Text and textLabel.Text ~= (LocalPlayer.DisplayName .. "'s Base") then
-                            local podiums = safeFind(plot, "AnimalPodiums")
-                            if podiums then
-                                for _, podium in pairs(podiums:GetChildren()) do
-                                    local base = safeFind(podium, "Base", true)
-                                    if base then
-                                        local spawn = safeFind(base, "Spawn", true)
-                                        if spawn then
-                                            local attachment = safeFind(spawn, "Attachment", true)
-                                            if attachment then
-                                                local overhead = safeFind(attachment, "AnimalOverhead", true)
-                                                if overhead then
-                                                    local stolen = safeFind(overhead, "Stolen")
-                                                    if not (stolen and (stolen.Text == "CRAFTING" or stolen.Text == "IN MACHINE")) then
-                                                        local gen = safeFind(overhead, "Generation")
-                                                        local rarity = safeFind(overhead, "Rarity")
-                                                        local name = safeFind(overhead, "DisplayName")
-                                                        if gen and rarity and name and gen.Text then
-                                                            local val = parseValue(gen.Text)
-                                                            if val >= minVal and val <= maxVal then
-                                                                table.insert(results, {nome = name.Text, raridade = rarity.Text, generation = gen.Text})
-                                                                scanStats.totalFinds += 1
-                                                            end
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
+            
+            -- Step-by-step nil-safe chaining for PlotSign hierarchy
+            local plotSign = plot:FindFirstChild("PlotSign")
+            if not plotSign then continue end
+            
+            local surfaceGui = plotSign:FindFirstChild("SurfaceGui")
+            if not surfaceGui then continue end
+            
+            local frame = surfaceGui:FindFirstChild("Frame")
+            if not frame then continue end
+            
+            local textLabel = frame:FindFirstChild("TextLabel")
+            if not textLabel or not textLabel.Text or textLabel.Text == (LocalPlayer.DisplayName .. "'s Base") then continue end
+            
+            -- Now podiums
+            local podiums = plot:FindFirstChild("AnimalPodiums")
+            if not podiums then continue end
+            
+            for _, podium in pairs(podiums:GetChildren()) do
+                if not podium then continue end
+                
+                -- Step-by-step for Base > Spawn > Attachment > AnimalOverhead
+                local base = podium:FindFirstChild("Base")
+                if not base then continue end
+                
+                local spawn = base:FindFirstChild("Spawn")
+                if not spawn then continue end
+                
+                local attachment = spawn:FindFirstChild("Attachment")
+                if not attachment then continue end
+                
+                local overhead = attachment:FindFirstChild("AnimalOverhead")
+                if not overhead then continue end
+                
+                local stolen = overhead:FindFirstChild("Stolen")
+                if stolen and (stolen.Text == "CRAFTING" or stolen.Text == "IN MACHINE") then continue end
+                
+                local gen = overhead:FindFirstChild("Generation")
+                if not gen or not gen.Text then continue end
+                
+                local rarity = overhead:FindFirstChild("Rarity")
+                if not rarity then continue end
+                
+                local name = overhead:FindFirstChild("DisplayName")
+                if not name or not name.Text then continue end
+                
+                local val = parseValue(gen.Text)
+                if val >= minVal and val <= maxVal then
+                    table.insert(results, {nome = name.Text, raridade = rarity.Text, generation = gen.Text})
+                    scanStats.totalFinds += 1
                 end
             end
         end
-        print("🧠 [ZH Notifier] Scanned " .. plotCount .. " plots | Found: " .. #results)
+        print("🧠 [ZH Notifier] Scanned " .. plotCount .. " plots | Found: " .. #results .. " in tier " .. minStr .. "-" .. maxStr)
         return results
     end
     
@@ -151,8 +173,10 @@ task.spawn(function()
         
         local counts = {}
         for _, item in ipairs(brainrots) do
-            local key = item.nome .. "|" .. item.generation
-            counts[key] = (counts[key] or 0) + 1
+            if item.nome and item.generation then
+                local key = item.nome .. "|" .. item.generation
+                counts[key] = (counts[key] or 0) + 1
+            end
         end
         
         local news = {}
@@ -160,7 +184,9 @@ task.spawn(function()
             if not enviados[key] then
                 enviados[key] = true
                 local name, gen = key:match("(.+)|(.+)")
-                table.insert(news, {nome = name, generation = gen, quantidade = qty})
+                if name and gen then
+                    table.insert(news, {nome = name, generation = gen, quantidade = qty, raridade = brainrots[1].raridade or "Unknown"})  -- Use first rarity if avail
+                end
             end
         end
         
@@ -169,7 +195,7 @@ task.spawn(function()
         local utcTime = os.date("!%H:%M:%S UTC")
         local text = ""
         for i, item in ipairs(news) do
-            text = text .. "🧠 " .. item.nome .. " (" .. item.raridade .. ") — " .. item.generation
+            text = text .. "🧠 " .. item.nome .. " (" .. (item.raridade or "N/A") .. ") — " .. item.generation
             if item.quantidade > 1 then text = text .. " x" .. item.quantidade end
             if i < #news then text = text .. "\n" end
         end
@@ -178,17 +204,17 @@ task.spawn(function()
             embeds = {{
                 title = "🧠 " .. title,
                 description = text,
-                color = 16711680,  -- Red for power
+                color = 16711680,
                 fields = {
                     {name = "📊 Server", value = getServerInfo(), inline = true},
                     {name = "🆔 Job ID", value = "```" .. game.JobId .. "```", inline = true},
                     {name = "🔗 Join", value = "[TP NOW](https://ogsunny.github.io/brainrot-notifier/?placeId=" .. game.PlaceId .. "&gameInstanceId=" .. game.JobId .. ")", inline = false}
                 },
-                footer = {text = "🧠 ZH Notifier | " .. tierName .. " | " .. utcTime .. " | Scans: " .. scanStats.totalScans}
+                footer = {text = "🧠 ZH Notifier v2.2 | " .. tierName .. " | " .. utcTime .. " | Scans: " .. scanStats.totalScans .. " | Finds: " .. scanStats.totalFinds}
             }}
         }
         
-        task.spawn(function()  -- Async send for power
+        task.spawn(function()
             pcall(function()
                 local timestamp = os.time()
                 local userId = tostring(LocalPlayer.UserId)
@@ -209,20 +235,24 @@ task.spawn(function()
         end)
     end
     
-    -- Wait for full load with retry
+    -- Robust load wait
     local loadAttempts = 0
     repeat
         task.wait(2)
         loadAttempts += 1
-        if loadAttempts > 10 then powerfulHop("load fail") return end
-    until game:IsLoaded() and workspace:FindFirstChild("Plots")
+        if loadAttempts > 15 then  -- Extended for safety
+            print("🧠 [ZH Notifier] Load timeout—hopping.")
+            powerfulHop("load fail")
+            return
+        end
+    until game:IsLoaded() and workspace:FindFirstChild("Plots") and #workspace.Plots:GetChildren() > 0
     
-    print("🧠 [ZH Notifier] 🚀 FULLY LOADED | Hop in " .. hopDelay .. "s | Ready to dominate!")
+    print("🧠 [ZH Notifier] 🚀 FULLY LOADED | Hop in " .. hopDelay .. "s | Ready to dominate servers!")
     
-    -- Powerful Loop: Scan every 3s, hop on timer/invalid
+    -- Main Loop: Fast, safe scans
     task.spawn(function()
         while true do
-            task.wait(3)  -- Fast scans
+            task.wait(3)
             scanStats.totalScans += 1
             
             if tick() >= hopTimer then
@@ -235,7 +265,7 @@ task.spawn(function()
                 return
             end
             
-            -- Parallel tier scans (Lua power: spawn per tier)
+            -- Parallel tiers
             for _, tier in ipairs(tiers) do
                 task.spawn(function()
                     local brainrots = scanBrainrots(tier.min, tier.max)
@@ -245,8 +275,11 @@ task.spawn(function()
         end
     end)
     
-    -- Anti-kick: Humanize with heartbeat
+    -- Heartbeat safety net
     RunService.Heartbeat:Connect(function()
-        if tick() >= hopTimer then powerfulHop("heartbeat hop") return end
+        if tick() >= hopTimer then
+            powerfulHop("heartbeat")
+            return
+        end
     end)
 end)
