@@ -71,7 +71,7 @@ task.spawn(function()
     local scanStats = {totalScans = 0, totalFinds = 0}
     
     -- Powerful Hop Config
-    local hopDelay = 60
+    local hopDelay = 36
     local hopTimer = tick() + hopDelay
     
     local function powerfulHop(reason)
