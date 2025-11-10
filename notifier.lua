@@ -1,21 +1,47 @@
 task.spawn(function()
-    print("[Notifier] Starting load check for PlaceId: " .. game.PlaceId)  -- Debug: Confirm PlaceId
-    if game.PlaceId ~= 109983668079237 then 
-        print("[Notifier] Wrong game—skipping.") 
-        return 
-    end
-    
-    -- Private server check (existing)
-    if workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Codes") and workspace.Map.Codes:FindFirstChild("Main") and workspace.Map.Codes.Main:FindFirstChild("SurfaceGui") and workspace.Map.Codes.Main.SurfaceGui:FindFirstChild("MainFrame") and workspace.Map.Codes.Main.SurfaceGui.MainFrame:FindFirstChild("PrivateServerMessage") and workspace.Map.Codes.Main.SurfaceGui.MainFrame.PrivateServerMessage.Visible == true then 
-        print("[Notifier] In private server—skipping scans.") 
-        return 
-    end
-    print("[Notifier] Game checks passed—ready to scan.")  -- Debug: Here means it's good to go
-    
+    local TeleportService = game:GetService("TeleportService")
     local HttpService = game:GetService("HttpService")
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
     local RunService = game:GetService("RunService")
+    
+    print("🧠 ZH Notifier v2.0 - Powerful Auto-Scanner Loaded! 🧠")
+    
+    -- Auto-join ZH if not in game
+    if game.PlaceId ~= 109983668079237 then
+        print("🧠 [ZH Notifier] Not in Steal a Brainrot—auto-joining PlaceId 109983668079237...")
+        pcall(function() TeleportService:Teleport(109983668079237, LocalPlayer) end)
+        return
+    end
+    
+    print("🧠 [ZH Notifier] In ZH—validating server...")
+    
+    -- Enhanced private/full server checks
+    local function isValidServer()
+        if #Players:GetPlayers() < 2 or #Players:GetPlayers() >= (Players.MaxPlayers or 8) then
+            print("🧠 [ZH Notifier] Invalid pop (" .. #Players:GetPlayers() .. ")—hopping soon.")
+            return false
+        end
+        if workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Codes") and workspace.Map.Codes:FindFirstChild("Main") and workspace.Map.Codes.Main:FindFirstChild("SurfaceGui") and workspace.Map.Codes.Main.SurfaceGui:FindFirstChild("MainFrame") and workspace.Map.Codes.Main.SurfaceGui.MainFrame:FindFirstChild("PrivateServerMessage") and workspace.Map.Codes.Main.SurfaceGui.MainFrame.PrivateServerMessage.Visible == true then
+            print("🧠 [ZH Notifier] Private server detected—hopping.")
+            return false
+        end
+        local plots = workspace:FindFirstChild("Plots")
+        if not plots or #plots:GetChildren() < 2 then
+            print("🧠 [ZH Notifier] No/low plots—retrying load...")
+            return false
+        end
+        return true
+    end
+    
+    if not isValidServer() then
+        wait(3)  -- Brief retry
+        if not isValidServer() then
+            print("🧠 [ZH Notifier] Server invalid—auto-hopping.")
+            pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end)
+            return
+        end
+    end
     
     local baseUrl = "https://notifier.jemalagegidze.workers.dev"
     local tiers = {
@@ -26,36 +52,124 @@ task.spawn(function()
     }
     
     local enviados = {}
-    local playerCache = {}
+    local scanStats = {totalScans = 0, totalFinds = 0}  -- Power: Track stats
     
-    local function formatValue(num)
-        if num >= 1e9 then
-            return string.format("%.2fB", num / 1e9)
-        elseif num >= 1e6 then
-            return string.format("%.2fM", num / 1e6)
-        elseif num >= 1e3 then
-            return string.format("%.1fK", num / 1e3)
-        else
-            return tostring(math.floor(num))
-        end
+    -- Powerful Hop Config: Hop after 60s or invalid
+    local hopDelay = 60  -- Seconds per server (tuned for power: frequent fresh scans)
+    local hopTimer = tick() + hopDelay
+    
+    local function powerfulHop(reason)
+        print("🧠 [ZH Notifier] Hopping (" .. reason .. ")—stats: " .. scanStats.totalScans .. " scans, " .. scanStats.totalFinds .. " finds.")
+        enviados = {}  -- Reset dedupe for new server
+        pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end)
     end
     
     local function gerarHash(texto)
         local soma = 0
-        for i = 1, #texto do
-            local b = string.byte(texto, i)
-            if b then soma += b end
-        end
+        for i = 1, #texto do local b = string.byte(texto, i) if b then soma += b end end
         return tostring(soma)
     end
     
-    local function enviarWebhook(discordData, url)
-        print("[Notifier] Attempting webhook to: " .. url)  -- Debug: See if it tries to send
-        pcall(function()
-            local timestamp = os.time()
-            local userId = tostring(LocalPlayer.UserId)
-            local hash = gerarHash(userId .. ":" .. timestamp .. ":Webhookzinha")
-            local success, err = pcall(function()
+    local function parseValue(str)  -- Optimized
+        if not str then return 0 end
+        str = str:gsub("[^%d%.KMB]", ""):gsub(",", "")
+        local num, suf = str:match("([%d%.]+)([KMB]?)")
+        num = tonumber(num) or 0
+        if suf == "K" then num *= 1000 elseif suf == "M" then num *= 1000000 elseif suf == "B" then num *= 1000000000 end
+        return num
+    end
+    
+    local function scanBrainrots(minStr, maxStr)  -- Powerful: Faster traversal
+        local minVal, maxVal = parseValue(minStr), parseValue(maxStr)
+        if minVal > maxVal then minVal, maxVal = maxVal, minVal end
+        local results = {}
+        local plots = workspace.Plots
+        if not plots then return results end
+        
+        local plotCount = 0
+        for _, plot in pairs(plots:GetChildren()) do  -- Use pairs for speed
+            plotCount += 1
+            local sign = plot:FindFirstChild("PlotSign", true):FindFirstChild("SurfaceGui", true):FindFirstChild("Frame", true):FindFirstChild("TextLabel", true)
+            if sign and sign.Text and sign.Text ~= (LocalPlayer.DisplayName .. "'s Base") then
+                local podiums = plot:FindFirstChild("AnimalPodiums")
+                if podiums then
+                    for _, podium in pairs(podiums:GetChildren()) do
+                        local overhead = podium:FindFirstChild("Base", true):FindFirstChild("Spawn", true):FindFirstChild("Attachment", true):FindFirstChild("AnimalOverhead", true)
+                        if overhead then
+                            local stolen = overhead:FindFirstChild("Stolen")
+                            if not (stolen and (stolen.Text == "CRAFTING" or stolen.Text == "IN MACHINE")) then
+                                local gen = overhead:FindFirstChild("Generation")
+                                local rarity = overhead:FindFirstChild("Rarity")
+                                local name = overhead:FindFirstChild("DisplayName")
+                                if gen and rarity and name and gen.Text then
+                                    local val = parseValue(gen.Text)
+                                    if val >= minVal and val <= maxVal then
+                                        table.insert(results, {nome = name.Text, raridade = rarity.Text, generation = gen.Text})
+                                        scanStats.totalFinds += 1
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        print("🧠 [ZH Notifier] Scanned " .. plotCount .. " plots | Found: " .. #results)
+        return results
+    end
+    
+    local function getServerInfo()
+        return tostring(#Players:GetPlayers()) .. "/" .. tostring(Players.MaxPlayers or 8)
+    end
+    
+    local function sendWebhook(brainrots, url, tierName, title)
+        if not brainrots or #brainrots == 0 then return end
+        if #Players:GetPlayers() >= (Players.MaxPlayers or 8) then return end
+        
+        local counts = {}
+        for _, item in ipairs(brainrots) do
+            local key = item.nome .. "|" .. item.generation
+            counts[key] = (counts[key] or 0) + 1
+        end
+        
+        local news = {}
+        for key, qty in pairs(counts) do
+            if not enviados[key] then
+                enviados[key] = true
+                local name, gen = key:match("(.+)|(.+)")
+                table.insert(news, {nome = name, generation = gen, quantidade = qty})
+            end
+        end
+        
+        if #news == 0 then return end
+        
+        local utcTime = os.date("!%H:%M:%S UTC")
+        local text = ""
+        for i, item in ipairs(news) do
+            text = text .. "🧠 " .. item.nome .. " (" .. item.raridade .. ") — " .. item.generation
+            if item.quantidade > 1 then text = text .. " x" .. item.quantidade end
+            if i < #news then text = text .. "\n" end
+        end
+        
+        local discordData = {
+            embeds = {{
+                title = "🧠 " .. title,
+                description = text,
+                color = 16711680,  -- Red for power
+                fields = {
+                    {name = "📊 Server", value = getServerInfo(), inline = true},
+                    {name = "🆔 Job ID", value = "```" .. game.JobId .. "```", inline = true},
+                    {name = "🔗 Join", value = "[TP NOW](https://ogsunny.github.io/brainrot-notifier/?placeId=" .. game.PlaceId .. "&gameInstanceId=" .. game.JobId .. ")", inline = false}
+                },
+                footer = {text = "🧠 ZH Notifier | " .. tierName .. " | " .. utcTime .. " | Scans: " .. scanStats.totalScans}
+            }}
+        }
+        
+        task.spawn(function()  -- Async send for power
+            pcall(function()
+                local timestamp = os.time()
+                local userId = tostring(LocalPlayer.UserId)
+                local hash = gerarHash(userId .. ":" .. timestamp .. ":ZHNotifier")
                 HttpService:RequestAsync({
                     Url = url,
                     Method = "POST",
@@ -67,148 +181,49 @@ task.spawn(function()
                         dados = discordData
                     })
                 })
+                print("🧠 [ZH Notifier] 🔥 PING FIRED to " .. tierName .. "! (" .. #news .. " new)")
             end)
-            if success then
-                print("[Notifier] Webhook sent successfully!")  -- Debug: Confirm send
-            else
-                print("[Notifier] Webhook failed: " .. tostring(err))  -- Debug: Errors here
-            end
         end)
     end
     
-    local function parseValue(str)
-        if not str or type(str) ~= "string" then return 0 end
-        str = str:gsub("%$", ""):gsub("%s", ""):gsub("/s", ""):gsub("/S", ""):gsub(",", "")
-        local num, suf = str:match("([%d%.%,]+)([KMB]?)")
-        num = tonumber((num:gsub(",", ""))) or 0
-        if suf == "K" then num *= 1e3
-        elseif suf == "M" then num *= 1e6
-        elseif suf == "B" then num *= 1e9 end
-        return num
-    end
+    -- Wait for full load with retry
+    local loadAttempts = 0
+    repeat
+        task.wait(2)
+        loadAttempts += 1
+        if loadAttempts > 10 then powerfulHop("load fail") return end
+    until game:IsLoaded() and workspace:FindFirstChild("Plots")
     
-    local function scanBrainrots()
-        local playerCount = #Players:GetPlayers()
-        print("[Notifier] Scanning... Total players: " .. playerCount)  -- Debug: Player count
-        if playerCount < 3 then 
-            print("[Notifier] Too few players (<3)—skipping scan.") 
-            return {} 
-        end
-        local brainrotsByTier = {}
-        for _, tier in ipairs(tiers) do
-            brainrotsByTier[tier.path] = {}
-        end
-        
-        local foundStats = 0  -- Debug counter
-        for _, pl in ipairs(Players:GetPlayers()) do
-            if pl ~= LocalPlayer and pl:FindFirstChild("leaderstats") then
-                local stats = playerCache[pl] or pl.leaderstats
-                playerCache[pl] = stats
-                
-                local income = stats:FindFirstChild("IncomePerSec") or stats:FindFirstChild("Income")
-                local cash = stats:FindFirstChild("Cash") or stats:FindFirstChild("Money")
-                print("[Notifier] Checked " .. pl.DisplayName .. ": Income=" .. tostring(income and income.Value or "nil") .. ", Cash=" .. tostring(cash and cash.Value or "nil"))  -- Debug: Per-player stats
-                
-                if income and income.Value and cash and cash.Value > 100000 then
-                    foundStats += 1
-                    local val = income.Value
-                    local gen = formatValue(val) .. "/s"
-                    local totalEst = cash.Value + (val * 60)
-                    
-                    local matchedTiers = 0
-                    for _, tier in ipairs(tiers) do
-                        local minVal, maxVal = parseValue(tier.min), parseValue(tier.max)
-                        if val >= minVal and val <= maxVal and totalEst > 100000 then
-                            table.insert(brainrotsByTier[tier.path], {nome = pl.DisplayName, generation = gen, valor = totalEst})
-                            matchedTiers += 1
-                        end
-                    end
-                    if matchedTiers > 0 then
-                        print("[Notifier] " .. pl.DisplayName .. " matched " .. matchedTiers .. " tiers! Val: " .. val)  -- Debug: Matches
-                    end
-                end
-            end
-        end
-        print("[Notifier] Scan complete: Found " .. foundStats .. " qualifying players.")  -- Debug: Summary
-        return brainrotsByTier
-    end
+    print("🧠 [ZH Notifier] 🚀 FULLY LOADED | Hop in " .. hopDelay .. "s | Ready to dominate!")
     
-    local function buildAndSend(tier, brainrots)
-        local url = baseUrl .. tier.path
-        print("[Notifier] Building for tier " .. tier.name .. ": " .. #brainrots .. " brainrots")  -- Debug: Per tier
-        if #brainrots == 0 then return end
-        
-        local newData = {}
-        for _, b in ipairs(brainrots) do
-            local key = b.nome .. "|" .. b.generation
-            if not newData[key] then
-                newData[key] = {nome = b.nome, generation = b.generation, valor = b.valor, count = 0}
-            end
-            newData[key].count += 1
-            newData[key].valor = math.max(newData[key].valor, b.valor)
-        end
-        
-        local novos = {}
-        for key, data in pairs(newData) do
-            if not enviados[key] then
-                enviados[key] = true
-                table.insert(novos, {nome = data.nome, generation = data.generation, quantidade = data.count, valor = data.valor})
-            end
-        end
-        
-        if #novos == 0 then 
-            print("[Notifier] No new brainrots for " .. tier.name) 
-            return 
-        end
-        
-        print("[Notifier] Sending " .. #novos .. " new alerts for " .. tier.name)  -- Debug: Before send
-        
-        local utcTime = os.date("!%H:%M:%S")
-        local text = ""
-        for i, b in ipairs(novos) do
-            text = text .. "🧠 " .. b.nome .. " — " .. b.generation .. " (Est: $" .. string.format("%.0f", b.valor) .. ")"
-            if b.quantidade > 1 then text = text .. " - " .. b.quantidade .. "x" end
-            if i < #novos then text = text .. "\n" end
-        end
-        
-        local playersStr = tostring(#Players:GetPlayers()) .. "/" .. tostring(Players.MaxPlayers or 0)
-        local discordData = {
-            embeds = {{
-                title = "🧠 " .. tier.title .. " V2",
-                description = text,
-                color = 3447003,
-                fields = {
-                    {name = "📊 Server Info", value = playersStr, inline = false},
-                    {name = "🆔 Job ID", value = "```" .. tostring(game.JobId) .. "```", inline = false},
-                    {name = "🔗 Join Server", value = "[CLICK TO JOIN](https://ogsunny.github.io/brainrot-notifier/?placeId=" .. game.PlaceId .. "&gameInstanceId=" .. game.JobId .. ")", inline = false}
-                },
-                footer = {text = "Zvios Hub ZH Notifier 🧠 | Scanner " .. tier.name .. " | " .. utcTime}
-            }}
-        }
-        
-        enviarWebhook(discordData, url)
-    end
-    
-    print("[Notifier] Waiting for game load...")  -- Debug: Load wait
-    repeat task.wait(1) until game:IsLoaded()  -- Bumped to 1s for reliability
-    print("[Notifier] Game loaded—starting scan loop!")  -- Debug: Loop start
-    
+    -- Powerful Loop: Scan every 3s, hop on timer/invalid
     task.spawn(function()
-        local scanCount = 0
-        while task.wait(5) do  -- Bumped to 5s for less spam/debug
-            scanCount += 1
-            print("[Notifier] Loop #" .. scanCount .. " starting...")  -- Debug: Loop ticks
-            if #Players:GetPlayers() >= (Players.MaxPlayers or 0) then 
-                print("[Notifier] Server full—skipping.") 
-                continue 
+        while true do
+            task.wait(3)  -- Fast scans
+            scanStats.totalScans += 1
+            
+            if tick() >= hopTimer then
+                powerfulHop("timer")
+                return
             end
-            pcall(function()
-                local brainrotsByTier = scanBrainrots()
-                for _, tier in ipairs(tiers) do
-                    buildAndSend(tier, brainrotsByTier[tier.path])
-                end
-            end)
+            
+            if not isValidServer() then
+                powerfulHop("invalid")
+                return
+            end
+            
+            -- Parallel tier scans (Lua power: spawn per tier)
+            for _, tier in ipairs(tiers) do
+                task.spawn(function()
+                    local brainrots = scanBrainrots(tier.min, tier.max)
+                    sendWebhook(brainrots, baseUrl .. tier.path, tier.name, tier.title)
+                end)
+            end
         end
     end)
-    print("[Notifier] Auto-scan loop spawned!")  -- Debug: End
+    
+    -- Anti-kick: Humanize with heartbeat
+    RunService.Heartbeat:Connect(function()
+        if tick() >= hopTimer then powerfulHop("heartbeat hop") return end
+    end)
 end)
