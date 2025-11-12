@@ -2,14 +2,26 @@
 <html>
 <head><title>Zvios Hub ZH Brainrot Joiner</title></head>
 <body>
-  <h1>Copy & Paste to Executor:</h1>
-  <textarea id="script" rows="3" cols="50" readonly></textarea>
-  <button onclick="navigator.clipboard.writeText(document.getElementById('script').value); alert('Copied!')">Auto-Copy</button>
+  <h1>Auto-Join Server:</h1>
+  <p>Click the button below to automatically join the server in Roblox (requires Roblox installed).</p>
+  <button id="joinBtn" onclick="joinServer()">Join Server</button>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const placeId = urlParams.get('placeId') || '109983668079237';
     const jobId = urlParams.get('gameInstanceId');
-    document.getElementById('script').value = `local TeleportService = game:GetService("TeleportService")\nTeleportService:TeleportToPlaceInstance(${placeId}, "${jobId}")`;
+    
+    function joinServer() {
+      let joinUrl;
+      if (jobId) {
+        joinUrl = `roblox://experiences/start?placeId=${placeId}&gameInstanceId=${jobId}`;
+      } else {
+        joinUrl = `roblox://experiences/start?placeId=${placeId}`;
+      }
+      window.location.href = joinUrl;
+    }
+    
+    // Optionally, auto-join on page load after a short delay
+    // setTimeout(joinServer, 1000);
   </script>
 </body>
 </html>
